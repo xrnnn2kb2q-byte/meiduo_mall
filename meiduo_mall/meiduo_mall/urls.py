@@ -16,7 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.http import HttpResponse
-from django.urls import path
+from django.urls import path, include
+
 
 def log(request):
     # 1. 导入
@@ -28,10 +29,12 @@ def log(request):
     logger.warning('redis缓存不足')
     logger.error('该记录不存在')
     logger.debug('~~~~~~~~~~~~~~~')
-    
+
     return HttpResponse('log')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('log/',log)
+    path('log/',log),
+    # 导入 users子应用的路由
+    path('',include('apps.users.urls')),
 ]
