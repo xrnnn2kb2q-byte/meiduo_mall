@@ -34,11 +34,14 @@ from django.views import View
 from django.views import View
 from apps.users.models import User
 from django.http import JsonResponse
+import re
 
 class UsernameCountView(View):
 
     def get(self,request,username):
-        # 1.接收用户名
+        # 1.接收用户名，对这个用户名进行以下判断
+        # if not re.match('[a-zA-Z0-9_-]{5,20}',username):
+        #     return JsonResponse({'code':200,'errmsg':'用户名不满足要求'})
         # 2.根据用户名查询数据库
         count = User.objects.filter(username=username).count()
         # 3.返回响应
