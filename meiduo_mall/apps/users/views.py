@@ -101,4 +101,23 @@ class RegisterView(View):
 
         user = User.objects.create_user(username=username,password=password,mobile=mobile)
 
+        # 如何设置session信息
+        # request.session['user_id'] = user.id
+
+        # 系统(Django)为我们提供了状态保持的方法
+        from django.contrib.auth import login
+        # request, user
+        # 状态保持 -- 登录用户的状态保持
+        # user 已经登录的用户信息
+        login(request,user)
+
         return JsonResponse({'code':0,'errmsg':'ok'})
+
+"""
+    如果需求是注册成功后即表示用户认证通过，那么此时可以再注册成功后实现状态保持(注册成功即已经登录)
+    如果需求是注册成功后即表示用户认证通过，那么此时不用再注册成功后实现状态保持(注册成功，单独登录)
+    
+    实现状态保持主要有两种方式：
+        在客户端存储信息使用Cookie
+        在服务器端存储信息使用Session
+"""
