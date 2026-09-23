@@ -83,18 +83,22 @@ class RegisterView(View):
         # 获取数据
         username = body_dict.get('username')
         password = body_dict.get('password')
-        password02 = body_dict.get('password02')
+        password2 = body_dict.get('password2')
         mobile = body_dict.get('mobile')
         allow = body_dict.get('allow')
 
         # 验证数据
-        if not all([username,password,password02,mobile,allow]):
+        if not all([username,password,password2,mobile,allow]):
             return JsonResponse({'code':400,'errmsg':'参数不全'})
 
         if not re.match('[a-zA-Z_-]{5,20}',username):
             return JsonResponse({'code':400,'errmsg':'用户名不满足规则'})
 
-        user = User(username=username,password=password,mobile=mobile)
-        user.save()
+        # 密码没有加密
+        # user = User(username=username,password=password,mobile=mobile)
+        # user.save()
+        # User.objects.create(username=username,password=password,mobile=mobile)
 
+        user = User.objects.create_user(username=username,password=password,mobile=mobile)
 
+        return JsonResponse({'code':0,'errmsg':'ok'})
