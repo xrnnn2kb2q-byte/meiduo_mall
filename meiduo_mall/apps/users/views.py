@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.views import View
+import json
 
 # Create your views here.
 
@@ -46,4 +47,54 @@ class UsernameCountView(View):
         count = User.objects.filter(username=username).count()
         # 3.返回响应
         return JsonResponse({'code':0,'count':count,'errmsg':'ok'})
+
+"""
+    我们不相信前端提交的任何数据！！！
+    前端：     当用户输入 用户名，密码，确认密码，手机号，是否同意协议之后，会点击注册按钮
+    
+    后端：
+        请求：         接受请求，获取数据
+        业务逻辑：      验证数据，数据入库
+        响应：         JSON{'code':0,'errmsg':'ok'}
+        
+        路由：         POST        register/
+        步骤：
+            1.接收请求(POST----------JSON)
+            2.获取数据
+            3.验证数据
+                3.1 用户名，密码，确认密码，手机号，是否同意协议 都要有
+                3.2 用户名满足规则，用户名不能重复
+                3.3 密码满足规则
+                3.4 确认密码和密码要一直
+                3.5 手机号满足规则，手机号也不能重复
+                3.6 需要同意协议
+            4.数据入库
+            5.返回响应
+"""
+
+class RegisterView(View):
+
+    def post(self,request):
+        # 接受请求
+        body_bytes = request.body
+        body_str = body_bytes.decode()
+        body_dict = json.loads(body_str)
+
+        # 获取数据
+        username = body_dict.get('username')
+        password = body_dict.get('password')
+        password02 = body_dict.get('password02')
+        mobile = body_dict.get('mobile')
+        allow = body_dict.get('allow')
+
+        # 验证数据
+        if not all([username,password,password02,mobile,allow]):
+            return JsonResponse({'code':400,'errmsg':'参数不全'})
+
+        if not re.match('[a-zA-Z_-]{5,20}',username):
+            return JsonResponse({'code':400,'errmsg':'用户名不满足规则'})
+
+        user = User(username=username,password=password,mobile=mobile)
+        user.save()
+
 
