@@ -15,7 +15,24 @@ import base64
 import datetime
 from urllib import request as urllib2
 import json
+import logging
+import os
+import ssl
+import sys
 from .xmltojson import xmltojson
+
+logger = logging.getLogger(__name__)
+
+
+def _open_url_with_certificates(request):
+    """Open an HTTPS request using an available system CA bundle."""
+    cafile = os.environ.get('SSL_CERT_FILE')
+    if not cafile and sys.platform == 'darwin' and os.path.isfile('/etc/ssl/cert.pem'):
+        # python.org builds on macOS may not have the bundled Install
+        # Certificates step applied; use macOS's installed CA bundle.
+        cafile = '/etc/ssl/cert.pem'
+    context = ssl.create_default_context(cafile=cafile)
+    return urllib2.urlopen(request, context=context, timeout=15)
 
 
 class REST:
@@ -264,7 +281,7 @@ class REST:
         req.data = body.encode()
         data = ''
         try:
-            res = urllib2.urlopen(req)
+            res = _open_url_with_certificates(req)
             data = res.read()
             res.close()
 
@@ -279,9 +296,25 @@ class REST:
                 self.log(url, body, data)
             return locations
         except Exception as error:
+            # Do not log the URL here: it contains a time-based auth signature.
+            error_code = getattr(error, 'code', None)
+            error_label = type(error).__name__
+            if error_code is not None:
+                error_label += ' (HTTP %s)' % error_code
+            error_reason = getattr(error, 'reason', None)
+            if error_reason is not None:
+                # urllib.error.URLError wraps the useful DNS/TLS/socket reason.
+                reason_code = getattr(error_reason, 'errno', None)
+                if reason_code is not None:
+                    error_label += ' (reason errno=%s: %s)' % (
+                        reason_code, getattr(error_reason, 'strerror', type(error_reason).__name__),
+                    )
+                else:
+                    error_label += ' (reason: %s)' % str(error_reason)
+            logger.error("SMS provider request failed (%s)", error_label)
             if self.Iflog:
                 self.log(url, body, data)
-            return {'172001': '网络错误'}
+            return {'statusCode': '172001', 'statusMsg': error_label}
 
     # 外呼通知
     # @param to 必选参数    被叫号码

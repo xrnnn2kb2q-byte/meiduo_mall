@@ -3,6 +3,9 @@
 # from .CCPRestSDK import REST
 # 测试的时候使用
 from libs.yuntongxun.CCPRestSDK import REST
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 说明：主账号，登陆云通讯网站后，可在"控制台-应用"中看到开发者主账号ACCOUNT SID
 _accountSid = '2c94811c9f3cb45601a0d33778cd595f'
@@ -64,9 +67,14 @@ class CCP(object):
         result = self.rest.sendTemplateSMS(to, datas, temp_id)
         # 如果云通讯发送短信成功，返回的字典数据result中statuCode字段的值为"000000"
         if result.get("statusCode") == "000000":
+            logger.info("SMS provider accepted template message (statusCode=%s)", result.get("statusCode"))
             # 返回0 表示发送短信成功
             return 0
         else:
+            logger.error(
+                "SMS provider rejected template message (statusCode=%s, statusMsg=%s)",
+                result.get("statusCode", "unknown"), result.get("statusMsg", "unknown"),
+            )
             # 返回-1 表示发送失败
             return -1
 

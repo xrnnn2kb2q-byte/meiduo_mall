@@ -89,31 +89,15 @@ var vm = new Vue({
         },
         // 检查手机号
         check_phone: function () {
-            var re = /^1[345789]\d{9}$/;
+            // Normalize accidental spaces when a phone number is pasted.
+            this.mobile = this.mobile.trim();
+            var re = /^1[3-9]\d{9}$/;
 
             if (re.test(this.mobile)) {
                 this.error_phone = false;
             } else {
                 this.error_phone_message = '您输入的手机号格式不正确';
                 this.error_phone = true;
-            }
-            if (this.error_phone == false) {
-                var url = this.host + '/mobiles/' + this.mobile + '/count/';
-                axios.get(url, {
-                    responseType: 'json',
-                     withCredentials:true,
-                })
-                    .then(response => {
-                        if (response.data.count > 0) {
-                            this.error_phone_message = '手机号已存在';
-                            this.error_phone = true;
-                        } else {
-                            this.error_phone = false;
-                        }
-                    })
-                    .catch(error => {
-                        console.log(error.response);
-                    })
             }
         },
         // 检查图片验证码
@@ -126,8 +110,8 @@ var vm = new Vue({
 			}
 		},
         check_sms_code: function () {
-            if (!this.sms_code) {
-                this.error_sms_code_message = '请填写短信验证码';
+            if (!/^\d{4}$/.test(this.sms_code)) {
+                this.error_sms_code_message = '请输入4位数字短信验证码';
                 this.error_sms_code = true;
             } else {
                 this.error_sms_code = false;
@@ -163,7 +147,14 @@ var vm = new Vue({
                 withCredentials:true,
             })
                 .then(response => {
+                    if (response.data.code !== 0) {
+                        this.error_sms_code_message = response.data.errmsg || '短信发送失败，请稍后重试';
+                        this.error_sms_code = true;
+                        this.sending_flag = false;
+                        return;
+                    }
                     // 表示后端发送短信成功
+                    this.error_sms_code = false;
                     // 倒计时60秒，60秒后允许用户再次点击发送短信验证码的按钮
                     var num = 60;
                     // 设置一个计时器
@@ -183,12 +174,10 @@ var vm = new Vue({
                     }, 1000, 60)
                 })
                 .catch(error => {
-                    if (error.response.status == 400) {
-                        this.error_sms_code_message = error.response.data.message;
-                        this.error_sms_code = true;
-                    } else {
-                        console.log(error.response.data);
-                    }
+                    this.error_sms_code_message = error.response && error.response.data
+                        ? (error.response.data.errmsg || '短信发送失败，请稍后重试')
+                        : '短信请求失败，请检查网络或稍后重试';
+                    this.error_sms_code = true;
                     this.sending_flag = false;
                 })
         },
@@ -226,16 +215,10 @@ var vm = new Vue({
                         }
                     })
                     .catch(error => {
-                        if (error.response.code == 400) {
-                            if ('non_field_errors' in error) {
-                                this.error_sms_code_message = error.response;
-                            } else {
-                                this.error_sms_code_message = '数据有误';
-                            }
-                            this.error_sms_code = true;
-                        } else {
-                            console.log(error);
-                        }
+                        var responseData = error.response && error.response.data;
+                        alert(responseData && responseData.errmsg
+                            ? responseData.errmsg
+                            : '注册失败，请稍后重试');
                     })
             }
         }
