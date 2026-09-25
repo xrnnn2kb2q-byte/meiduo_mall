@@ -1,3 +1,11 @@
+"""
+    生产者
+    消费者
+    队列（中间人、经纪人）
+    Celery() -- 将这三者实现了
+
+"""
+
 class Broker(object):
     # 任务队列
     broker_list = []

@@ -127,28 +127,18 @@ class SmsCodeView(View):
         sms_code = '%04d' % randint(0,9999)
         # 5.发送短信验证码
         try:
-            from libs.yuntongxun.sms import CCP
-            result = CCP().send_template_sms(mobile,[sms_code,5],1)
+            from celery_tasks.sms.tasks import celery_send_sms_code
+            celery_send_sms_code.delay(mobile,sms_code)
+            # result = CCP().send_template_sms(mobile,[sms_code,5],1)
         except Exception:
             # A local exception means the provider call did not complete;
             # release the reservation so the user can retry.
             redis_cli.delete(send_flag_key)
             raise
-        if result != 0:
-            redis_cli.delete(send_flag_key)
-            return JsonResponse(
-                {'code': 500, 'errmsg': '短信服务商未受理发送请求，请查看服务端日志'},
-                status=502,
-            )
+        # `.delay()` returns a Celery AsyncResult (a queued task handle), not
+        # the provider's integer status code. Reaching here means the broker
+        # accepted the task; provider delivery happens asynchronously.
         # Save the code only after the provider accepts the message.
         redis_cli.setex(mobile,300,sms_code)
         # 7.返回响应
         return JsonResponse({'code':0,'errmsg':'ok'})
-
-"""
-    生产者
-    消费者
-    队列（中间人、经纪人）
-    Celery() -- 将这三者实现了
-    
-"""
