@@ -724,6 +724,9 @@ html,body{height:100%}
 .reg_form li .msg_input,.reg_form li .msg_input{
 	width:170px;
 }
+.reg_form li .pic_code_input{
+	width:128px;
+}
 .reg_form .get_msg_code{
 	float: left;
 	width:108px;
@@ -739,9 +742,10 @@ html,body{height:100%}
 }
 .reg_form .pic_code{
 	float: left;
-	width:110px;
-	height:40px;
+	width:130px;
+	height:47px;
 	margin-left:10px;
+	cursor:pointer;
 }
 
 .reg_form li.agreement input{width:15px;height:15px;float:left;margin-top:13px;margin-left:87px;}

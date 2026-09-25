@@ -45,7 +45,7 @@ class ImageCodeView(View):
         # content_type的语法形式是：大类/小类
         # content_type(MIME类型)
         # 图片:image/jpeg, image/gif, image/png
-        return HttpResponse(image,content_type='image/jpeg')
+        return HttpResponse(image,content_type='image/png')
 
 """
     1.注册
@@ -115,19 +115,40 @@ class SmsCodeView(View):
         # 3.3 对比
         if redis_image_code.decode('utf-8').lower() != image_code.lower():
             return JsonResponse({'code':400,'error':'图片验证码错误'})
+
+        # Atomically reserve this phone number for 60 seconds. This also
+        # prevents concurrent requests from both passing the rate limit.
+        send_flag_key = 'send_flag_%s' % mobile
+        if not redis_cli.set(send_flag_key, 1, ex=60, nx=True):
+            return JsonResponse({'code':400,'errmsg':'不要频繁发送短信'})
         # 4.生成短信验证码
         from random import randint
         # The free SMS template only accepts 1-4 digit numeric placeholders.
         sms_code = '%04d' % randint(0,9999)
-        # 5.保存短信验证码
-        redis_cli.setex(mobile,300,sms_code)
-        # 6.发送短信验证码
-        from libs.yuntongxun.sms import CCP
-        result = CCP().send_template_sms(mobile,[sms_code,5],1)
+        # 5.发送短信验证码
+        try:
+            from libs.yuntongxun.sms import CCP
+            result = CCP().send_template_sms(mobile,[sms_code,5],1)
+        except Exception:
+            # A local exception means the provider call did not complete;
+            # release the reservation so the user can retry.
+            redis_cli.delete(send_flag_key)
+            raise
         if result != 0:
+            redis_cli.delete(send_flag_key)
             return JsonResponse(
                 {'code': 500, 'errmsg': '短信服务商未受理发送请求，请查看服务端日志'},
                 status=502,
             )
+        # Save the code only after the provider accepts the message.
+        redis_cli.setex(mobile,300,sms_code)
         # 7.返回响应
         return JsonResponse({'code':0,'errmsg':'ok'})
+
+"""
+    生产者
+    消费者
+    队列（中间人、经纪人）
+    Celery() -- 将这三者实现了
+    
+"""

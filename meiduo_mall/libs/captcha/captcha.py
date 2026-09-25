@@ -4,7 +4,7 @@
 # refer to `https://bitbucket.org/akorn/wheezy.captcha`
 
 import random
-import string
+import math
 import os.path
 from io import BytesIO
 
@@ -66,14 +66,14 @@ class Captcha(object):
             Captcha._instance = Captcha()
         return Captcha._instance
 
-    def initialize(self, width=200, height=75, color=None, text=None, fonts=None):
-        # self.image = Image.new('RGB', (width, height), (255, 255, 255))
-        self._text = text if text else random.sample(string.ascii_uppercase + string.ascii_uppercase + '3456789', 4)
-        self.fonts = fonts if fonts else \
-            [os.path.join(self._dir, 'fonts', font) for font in ['Arial.ttf', 'Georgia.ttf', 'actionj.ttf']]
+    def initialize(self, width=220, height=80, color=None, text=None, fonts=None):
+        # Avoid look-alike characters such as O/0, I/1, S/5, Z/2 and G/6.
+        alphabet = 'ABCDEFGHJKLMNPQRTUVWXY3479'
+        self._text = text if text else random.sample(alphabet, 4)
+        self.fonts = fonts if fonts else [os.path.join(self._dir, 'fonts', 'actionj.ttf')]
         self.width = width
         self.height = height
-        self._color = color if color else self.random_color(0, 200, random.randint(220, 255))
+        self._color = color if color else (24, 55, 92)
 
     @staticmethod
     def random_color(start, end, opacity=None):
@@ -120,78 +120,76 @@ class Captcha(object):
             draw.line(((x, y), (x + level, y)), fill=color if color else self._color, width=level)
         return image
 
-    def text(self, image, fonts, font_sizes=None, drawings=None,
-             squeeze_factor=0.75, color=None):
-        color = color if color else self._color
-
-        fonts = tuple([
-            truetype(name, size)
-            for name in fonts
-            for size in font_sizes or (65, 70, 75)
-        ])
-
-        draw = Draw(image)
-        char_images = []
-
-        for c in self._text:
-            font = random.choice(fonts)
-
-            # Pillow 新版本使用 textbbox()
-            bbox = draw.textbbox((0, 0), c, font=font)
-            c_width = bbox[2] - bbox[0]
-            c_height = bbox[3] - bbox[1]
-
-            char_image = Image.new(
-                'RGB',
-                (c_width, c_height),
-                (0, 0, 0)
-            )
-
-            char_draw = Draw(char_image)
-            char_draw.text(
-                (0, 0),
-                c,
-                font=font,
-                fill=color
-            )
-
-            char_image = char_image.crop(char_image.getbbox())
-
-            for drawing in drawings:
-                d = getattr(self, drawing)
-                char_image = d(char_image)
-
-            char_images.append(char_image)
-
-        width, height = image.size
-
-        offset = int(
-            (
-                    width
-                    - sum(
-                int(i.size[0] * squeeze_factor)
-                for i in char_images[:-1]
-            )
-                    - char_images[-1].size[0]
-            ) / 2
+    def text(self, image, fonts, font_sizes=None, color=None):
+        colors = (color,) if color else (
+            (22, 55, 96), (76, 39, 96), (24, 92, 78), (112, 54, 28),
         )
-
-        for char_image in char_images:
-            c_width, c_height = char_image.size
-
-            mask = char_image.convert('L').point(
-                lambda i: i * 1.97
+        sizes = font_sizes or (52, 56, 60)
+        width, height = image.size
+        glyphs = []
+        for char in self._text:
+            font = truetype(random.choice(fonts), random.choice(sizes))
+            bbox = font.getbbox(char)
+            padding = 6
+            glyph = Image.new(
+                'RGBA',
+                (bbox[2] - bbox[0] + padding * 2, bbox[3] - bbox[1] + padding * 2),
+                (0, 0, 0, 0),
             )
+            stroke_width = random.choice((0, 0, 1))
+            glyph_color = random.choice(colors)
+            outline_color = tuple(int(channel * 0.65 + 255 * 0.35) for channel in glyph_color)
+            text_position = (padding - bbox[0], padding - bbox[1])
+            draw = Draw(glyph)
+            draw.text(text_position, char, font=font,
+                      fill=(*outline_color, 255), stroke_width=2,
+                      stroke_fill=(*outline_color, 255))
+            draw.text(text_position, char, font=font,
+                      fill=(*glyph_color, 255), stroke_width=stroke_width,
+                      stroke_fill=(*glyph_color, 255))
 
-            image.paste(
-                char_image,
-                (offset, int((height - c_height) / 2)),
-                mask
-            )
+            shadow_alpha = glyph.getchannel('A').filter(ImageFilter.GaussianBlur(radius=0.8))
+            shadow_alpha = shadow_alpha.point(lambda alpha: int(alpha * 0.55))
+            shadow = Image.new('RGBA', glyph.size, (30, 35, 50, 0))
+            shadow.putalpha(shadow_alpha)
+            layered_glyph = Image.new('RGBA', glyph.size, (0, 0, 0, 0))
+            layered_glyph.alpha_composite(shadow, dest=(2, 2))
+            layered_glyph.alpha_composite(glyph)
+            glyph = layered_glyph
+            glyph = self.distort_glyph(glyph)
+            angle = random.uniform(-13, 13)
+            glyph = glyph.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True)
+            glyphs.append(glyph)
 
-            offset += int(c_width * squeeze_factor)
+        gap = random.randint(8, 12)
+        max_text_width = width - 24
+        text_width = sum(glyph.width for glyph in glyphs) + gap * (len(glyphs) - 1)
+        if text_width > max_text_width:
+            scale = (max_text_width - gap * (len(glyphs) - 1)) / sum(glyph.width for glyph in glyphs)
+            glyphs = [glyph.resize((int(glyph.width * scale), int(glyph.height * scale)),
+                                   Image.Resampling.LANCZOS) for glyph in glyphs]
+            text_width = sum(glyph.width for glyph in glyphs) + gap * (len(glyphs) - 1)
+
+        offset = (width - text_width) // 2
+        for glyph in glyphs:
+            y = (height - glyph.height) // 2 + random.randint(-7, 7)
+            image.paste(glyph, (offset, y), glyph)
+            offset += glyph.width + gap
 
         return image
+
+    @staticmethod
+    def distort_glyph(glyph):
+        """Bend strokes slightly with a smooth horizontal wave per scanline."""
+        width, height = glyph.size
+        amplitude = random.randint(2, 4)
+        phase = random.uniform(0, 2 * math.pi)
+        distorted = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        for y in range(height):
+            shift = round(amplitude * math.sin(2 * math.pi * y / max(1, height - 1) + phase))
+            row = glyph.crop((0, y, width, y + 1))
+            distorted.paste(row, (shift, y), row)
+        return distorted
 
     # draw text
     @staticmethod
@@ -241,12 +239,13 @@ class Captcha(object):
                 ('JGW9', '\x89PNG\r\n\x1a\n\x00\x00\x00\r...')
 
         """
-        image = Image.new('RGB', (self.width, self.height), (255, 255, 255))
+        image = Image.new('RGB', (self.width, self.height), (248, 250, 253))
         image = self.background(image)
-        image = self.text(image, self.fonts, drawings=['warp', 'rotate', 'offset'])
-        image = self.curve(image)
-        image = self.noise(image)
-        image = self.smooth(image)
+        image = self.noise(image, number=42, level=2, color=(202, 213, 226))
+        image = self.curve(image, width=2, number=6, color=(163, 179, 198))
+        image = self.curve(image, width=1, number=6, color=(190, 201, 216))
+        image = self.text(image, self.fonts, font_sizes=(52, 56, 60))
+        image = image.filter(ImageFilter.GaussianBlur(radius=0.55))
         text = "".join(self._text)
         out = BytesIO()
         image.save(out, format=fmt)
@@ -254,7 +253,7 @@ class Captcha(object):
 
     def generate_captcha(self):
         self.initialize()
-        return self.captcha("")
+        return self.captcha("", fmt='PNG')
 
 captcha = Captcha.instance()
 
