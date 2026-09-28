@@ -172,3 +172,65 @@ class RegisterView(View):
         在客户端存储信息使用Cookie
         在服务器端存储信息使用Session
 """
+
+"""
+    登录
+    
+    前端：
+        当用户把用户名和密码输入完成之后，会点击登录按钮。这个时候前端应该发送一个axios请求
+    
+    后端：
+        请求：         接收数据，验证数据
+        业务逻辑：      验证用户名和密码是否正确，session
+        响应：         返回JSON数据 0 成功，400 失败
+        
+    步骤：
+        1.接收数据
+        2.验证数据
+        3.验证用户名和密码是否正确
+        4.session
+        5.判断是否记住登录
+        6.返回响应
+"""
+
+class LoginView(View):
+    def post(self,request):
+        # 1. 接收数据
+        data = json.loads(request.body.decode())
+        username = data.get('username')
+        password = data.get('password')
+        remembered = data.get('remembered')
+        # 2. 验证数据
+        if not all([username,password]):
+            return JsonResponse({'code':400,'errmsg':'参数不全'})
+
+        # 3. 验证用户名和密码是否正确
+        # 我们可以通过模型根据用户名来查询
+        # User.objects.get(username=username)
+
+        # 方式2
+        from django.contrib.auth import authenticate
+        # authenticate 传递用户名和密码
+        # 如果用户名和密码正确，则返回 User 信息
+        # 如果用户名和密码不正确，则返回 None
+        user = authenticate(username=username,password=password)
+
+        if user is None:
+            return JsonResponse({'code':400,'errmsg':'账号或密码错误'})
+
+        # 4. session
+        from django.contrib.auth import login
+        login(request,user)
+
+        # 5. 判断是否记住登录
+        if remembered is not None:
+            # 记住登录 -- 2周 或者 1个月 具体多长时间 产品说了算
+            request.session.set_expiry(None)
+            pass
+        else:
+            # 不记住登录 浏览器关闭 session过期
+            request.session.set_expiry(0)
+            pass
+
+        # 6. 返回响应
+        return JsonResponse({'code':0,'errmsg':'ok'})
