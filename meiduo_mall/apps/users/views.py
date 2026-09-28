@@ -244,3 +244,26 @@ class LoginView(View):
         response.set_cookie('username',username)
 
         return response
+
+"""
+    前端：
+        当用户点击退出按钮的时候，前端发送一个axios delete秦秋
+    
+    后端：
+        请求：
+        
+        业务逻辑：           退出
+        
+        响应：             返回JSON数据
+"""
+
+from django.contrib.auth import logout
+class LogoutView(View):
+
+    def delete(self,request):
+        # 1.删除session信息
+        logout(request)
+        response = JsonResponse({'code':0,'errmsg':'ok'})
+        # 删除cookie信息，为什么要删除呢？ 因为前端是根据cookie信息来判断用户是否登录
+        response.delete_cookie('username')
+        return response
