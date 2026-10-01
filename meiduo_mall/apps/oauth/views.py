@@ -92,10 +92,11 @@ class QQLoginURLView(View):
             5.如果没有绑定过，则需要绑定
             6.如果绑定过，则直接登录
 """
-
+from apps.oauth.models import OAuthQQUser
+from django.contrib.auth import login
 class OauthQQView(View):
     def get(self,request):
-        code = request.get('code')
+        code = request.GET.get('code')
         if code is None:
             return JsonResponse({'code':400,'errmsg':'参数不全'})
         qq = OAuthQQ(
@@ -105,4 +106,18 @@ class OauthQQView(View):
             state='xxx',
         )
         token = qq.get_access_token(code)
-        openid = qq.get_openid(token)
+        openid = qq.get_open_id(token)
+        try:
+            qquser = OAuthQQUser.objects.get(openid=openid)
+        except OAuthQQUser.DoesNotExist:
+            # 不存在
+            response = JsonResponse({'code':400,'access_token':openid})
+            return response
+        else:
+            # 存在
+            # 6.1 设置session
+            login(request, qquser.user)
+            # 6.2 设置cookie
+            response = JsonResponse({'code':0,'errmsg':'ok'})
+            response.set_cookie('username',qquser.user.username)
+            return response
