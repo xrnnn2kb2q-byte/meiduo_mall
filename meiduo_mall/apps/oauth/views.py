@@ -94,6 +94,9 @@ class QQLoginURLView(View):
 """
 from apps.oauth.models import OAuthQQUser
 from django.contrib.auth import login
+import json
+from apps.users.models import User
+
 class OauthQQView(View):
     def get(self,request):
         code = request.GET.get('code')
@@ -121,3 +124,58 @@ class OauthQQView(View):
             response = JsonResponse({'code':0,'errmsg':'ok'})
             response.set_cookie('username',qquser.user.username)
             return response
+
+    def post(self,request):
+        # 1.接受请求
+        data= json.loads(request.body.decode())
+        # 2.获取请求参数 openid
+        mobile = data.get('mobile')
+        password = data.get('password')
+        sms = data.get('sms')
+        openid = data.get('access_token')
+
+        # 3.根据手机号进行用户信息的查询
+        try:
+            user = User.objects.get(mobile=mobile)
+        except User.DoesNotExist:
+            # 手机号不存在
+        # 5.查询到用户手机号没有注册，我们就创建一个user信息，然后再绑定
+            user = User.objects.create_user(username=mobile,password=password)
+
+        else:
+            # 手机号存在
+        # 4.查询到用户手机号已经注册了，判断密码是否正确，如果正确就可以直接保存（绑定）用户和openid信息
+            if not user.check_password(password):
+                return JsonResponse({'code':400,'errmsg':'账号或密码错误'})
+
+        OAuthQQUser.objects.create(user=user,openid=openid)
+
+        # 6.完成状态保持
+        login(request, user)
+        # 7.返回响应
+        response = JsonResponse({'code':0,'errmsg':'ok'})
+        response.set_cookie('username',user.username)
+        return response
+
+
+"""
+需求：绑定账号信息
+    QQ(openid) 和 美多的账号信息
+
+前端：
+    当用户输入 手机号，密码，短信验证码之后就发送axios请求。请求需要携带 mobile，password，sms_code，access_token(openid)
+
+后端：
+    请求：             接受请求，获取请求参数
+    业务逻辑：         绑定，完成状态保持
+    响应：             返回code=0，跳转到首页
+    路由：             POST    oauth_callback/
+    步骤：             
+        1.接受请求
+        2.获取请求参数 openid
+        3.根据手机号进行用户信息的查询
+        4.查询到用户手机号已经注册了，判断密码是否正确，如果正确就可以直接保存（绑定）用户和openid信息
+        5.查询到用户手机号没有注册，我们就创建一个user信息，然后再绑定
+        6.完成状态保持
+        7.返回响应
+"""
