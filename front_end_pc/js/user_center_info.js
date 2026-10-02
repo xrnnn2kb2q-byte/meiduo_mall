@@ -9,6 +9,7 @@ var vm = new Vue({
         set_email: false,
         send_email_btn_disabled: false,
         send_email_tip: '重新发送验证邮件',
+        sending_email: false,
         email_error: false,
         histories: [],
     },
@@ -76,6 +77,9 @@ var vm = new Vue({
         },
         // 保存email
         save_email: function () {
+            if (this.sending_email) {
+                return;
+            }
             var re = /^[a-z0-9][\w\.\-]*@[a-z0-9\-]+(\.[a-z]{2,5}){1,2}$/;
             if (re.test(this.email)) {
                 this.email_error = false;
@@ -83,6 +87,7 @@ var vm = new Vue({
                 this.email_error = true;
                 return;
             }
+            this.sending_email = true;
 
             // 进行前端页面请求:
             var url = this.host + '/emails/'
@@ -96,12 +101,17 @@ var vm = new Vue({
                 })
                 // 成功请求的回调
                 .then(response => {
+                    if (response.data.code !== 0) {
+                        throw new Error(response.data.errmsg || '邮件提交失败');
+                    }
                     this.set_email = false;
                     this.send_email_btn_disabled = true;
-                    this.send_email_tip = '已发送验证邮件'
+                    this.send_email_tip = '已提交发送，请查收邮件';
                 })
                 // 失败请求的回调:
                 .catch(error => {
+                    this.send_email_btn_disabled = false;
+                    this.send_email_tip = '重新发送验证邮件';
                     console.error('保存邮箱或发送邮件失败', error);
                     var detail = '请检查服务端日志';
                     if (error.response && error.response.data) {
@@ -110,6 +120,9 @@ var vm = new Vue({
                         detail = error.message;
                     }
                     alert('请求失败，原因：' + detail);
+                })
+                .then(() => {
+                    this.sending_email = false;
                 });
         }
     }

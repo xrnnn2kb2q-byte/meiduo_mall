@@ -3,6 +3,8 @@ from django.views import View
 import json
 from django.conf import settings
 
+from celery_tasks.email.tasks import celery_send_email
+
 # Create your views here.
 
 """
@@ -328,7 +330,6 @@ class EmailView(LoginRequiredJSONMixin,View):
         request.user.email = email
         request.user.save()
         # 4.发送一封激活邮件
-        from django.core.mail import send_mail
         subject = '美多商城激活邮件'
         message = ''
         recipient_list = [email]
@@ -336,18 +337,22 @@ class EmailView(LoginRequiredJSONMixin,View):
         from apps.users.utils import generic_email_verify_token
         token = generic_email_verify_token(user_id=request.user.id)
         verify_url = 'http://www.meiduo.site:8080/success_verify_email.html?token=%s' % token
-        html_message = '<p>请点击下面的链接验证邮箱（24 小时内有效）：</p><p><a href="%s">验证邮箱</a></p>' % verify_url
+        html_message = '<p>尊敬的用户您好！</p>' \
+                       '<p>感谢您使用美多商城。</p>' \
+                       '<p>您的邮箱为：%s 。请点击此链接激活您的邮箱：</p>' \
+                       '<p><a href="%s">%s</a></p>' % (email, verify_url, verify_url)
 
-        send_mail(
+        # 只将邮件任务放入队列；实际 SMTP 发送由 Celery worker 完成。
+        celery_send_email.delay(
             subject=subject,
             message=message,
             from_email=settings.EMAIL_FROM,
             recipient_list=recipient_list,
-            html_message=html_message
-
+            html_message=html_message,
         )
+
         # 5.返回响应
-        return JsonResponse({'code':0,'errmsg':'ok'})
+        return JsonResponse({'code':0,'errmsg':'邮件已提交发送队列'})
 
 
 class EmailVerificationView(View):

@@ -62,7 +62,7 @@
                                 <span>Email：</span>
                                 <div v-if="set_email">
                                     <input v-model="email" type="email" name="email">
-                                    <input @click="save_email" type="button" name="" value="保 存">
+                                    <input @click="save_email" :disabled="sending_email" type="button" name="" :value="sending_email ? '正在提交...' : '保 存'">
                                     <input @click="set_email=false" type="reset" name="" value="取 消">
                                     <div v-if="email_error">邮箱格式错误</div>
                                 </div>
@@ -70,7 +70,7 @@
                                     {{ email }}
                                     <div v-if="email_active">已验证</div>
                                     <div v-else>
-                                        待验证<input @click="save_email" :disabled="send_email_btn_disabled" type="button" :value="send_email_tip">
+                                        待验证<input @click="save_email" :disabled="send_email_btn_disabled || sending_email" type="button" :value="sending_email ? '正在提交...' : send_email_tip">
                                     </div>
                                 </div>
                                 <div v-else>
