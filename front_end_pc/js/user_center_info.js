@@ -102,7 +102,14 @@ var vm = new Vue({
                 })
                 // 失败请求的回调:
                 .catch(error => {
-                    alert('请求失败, 失败原因:', error);
+                    console.error('保存邮箱或发送邮件失败', error);
+                    var detail = '请检查服务端日志';
+                    if (error.response && error.response.data) {
+                        detail = error.response.data.errmsg || error.response.data.detail || detail;
+                    } else if (error.message) {
+                        detail = error.message;
+                    }
+                    alert('请求失败，原因：' + detail);
                 });
         }
     }

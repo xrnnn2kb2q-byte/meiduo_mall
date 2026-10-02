@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.views import View
 import json
+from django.conf import settings
 
 # Create your views here.
 
@@ -328,6 +329,25 @@ class EmailView(LoginRequiredJSONMixin,View):
         request.user.save()
         # 4.发送一封激活邮件
         # 一会单独讲发送邮件
+        from django.core.mail import send_mail
+        # subject           主题
+        subject = '美多商城激活邮件'
+        # message           邮件内容
+        message = ''
+        # recipient_list    收件人列表
+        recipient_list = [email]
+
+        # 邮件的内容如果是 html 这个时候使用 html_message
+        html_message = '<a href=http://www.itcast.cn>激活</a>'
+
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.EMAIL_FROM,
+            recipient_list=recipient_list,
+            html_message=html_message
+
+        )
         # 5.返回响应
         return JsonResponse({'code':0,'errmsg':'ok'})
 
@@ -337,4 +357,24 @@ django项目
 2.需求分析
 3.学习新知识
 4.掌握分析问题，解决问题的能力（debug）
+"""
+
+"""
+1.设置邮件服务器
+    我们设置 163邮箱服务器
+    相当于 我们开启了 让163帮助我们发送邮件，同时设置了一些信息（特别是授权码）
+    
+2.设置邮件发送的配置信息
+    MAILERS = {
+    'default': {
+        'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+        'OPTIONS': {
+            'host': 'smtp.163.com',
+            'port': 465,
+            'use_ssl': True,
+            'username': 'xavier_shaw26@163.com',
+            'password': 'JDphv34RgeHYu4q2',
+            },
+        },
+    }
 """

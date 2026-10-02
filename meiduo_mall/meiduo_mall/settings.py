@@ -12,6 +12,12 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+import certifi
+
+# Python.org's macOS Python may not have a system CA bundle configured.
+# Use certifi's trusted root bundle so SSL connections (including SMTP) can
+# verify server certificates instead of disabling certificate validation.
+os.environ.setdefault('SSL_CERT_FILE', certifi.where())
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -136,7 +142,14 @@ STATIC_URL = 'static/'
 
 MAILERS = {
     'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+        'OPTIONS': {
+            'host': 'smtp.163.com',
+            'port': 465,
+            'use_ssl': True,
+            'username': 'xavier_shaw26@163.com',
+            'password': 'JDphv34RgeHYu4q2',
+        },
     },
 }
 
@@ -226,3 +239,6 @@ QQ_CLIENT_ID = '101474184'
 QQ_CLIENT_SECRET = 'c6ce949e04e12ecc909ae6a8b09b637c'
 # 我们申请时添加的: 登录成功后回调的路径
 QQ_REDIRECT_URI = 'http://www.meiduo.site:8080/oauth_callback.html'
+
+# 发件人地址（SMTP 连接参数统一配置在上面的 MAILERS.default.OPTIONS 中）
+EMAIL_FROM = '美多商城<xavier_shaw26@163.com>'
