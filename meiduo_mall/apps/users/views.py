@@ -275,9 +275,16 @@ class LogoutView(View):
     我们需要是 返回JSON数据
 """
 from utils.views import LoginRequiredJSONMixin
-
 class CenterView(LoginRequiredJSONMixin,View):
 
     def get(self,request):
-        return JsonResponse({'code':0,'errmsg':'ok'})
+        # request.user 就是 已经登录的用户信息
+        info_data = {
+            'username':request.user.username,
+            'email':request.user.email,
+            'mobile':request.user.mobile,
+            'email_active':request.user.email_active,
+        }
+
+        return JsonResponse({'code':0,'errmsg':'ok','info_data':info_data})
 
