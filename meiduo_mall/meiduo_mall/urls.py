@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.http import HttpResponse
-from django.urls import path, include
+from django.urls import path, include, register_converter
 
 
 # def log(request):
@@ -34,9 +34,12 @@ from django.urls import path, include
 
 # 注册转换器
 from utils.converters import UsernameConverter
-from django.urls import register_converter, include
+from django.urls.converters import REGISTERED_CONVERTERS
 
-register_converter(UsernameConverter, 'username_converter')
+# Django raises ValueError if the URLconf is imported again in the same process
+# (for example during development autoreload). Register this project converter once.
+if 'username_converter' not in REGISTERED_CONVERTERS:
+    register_converter(UsernameConverter, 'username_converter')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -46,4 +49,3 @@ urlpatterns = [
     path('',include('apps.verifications.urls')),
     path('',include('apps.oauth.urls')),
 ]
-

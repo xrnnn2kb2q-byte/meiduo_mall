@@ -406,3 +406,51 @@ django项目
         },
     }
 """
+
+"""
+需求（知道我们要干什么？？？）
+    激活用户的邮件
+
+前端（用户干了什么，传递了什么参数）
+    用户会点击那个激活链接，那个激活链接携带了token
+
+后端：
+    请求              接受请求，获取参数，验证参数
+    业务逻辑           user_id,根据用户id查询数据，修改数据
+    响应              返回响应JSON
+    路由              PUT     emails/verification/    说明：token并没有在body里
+    步骤
+        1.接受请求
+        2.获取参数
+        3.验证参数
+        4.获取user_id
+        5.根据用户id查询数据
+        6.修改数据
+        7.返回响应JSON
+"""
+
+class EmailVerifyView(View):
+    def put(self,request):
+        # 1.接受请求
+        params = request.GET
+        # 2.获取参数
+        token = params.get('token')
+        # 3.验证参数
+        if token is None:
+            return JsonResponse({'code':400,'errmsg':'参数缺失'})
+        #4. 获取user_id
+        from apps.users.utils import check_email_verify_token
+        user_id = check_email_verify_token(token)
+        if user_id is None:
+            return JsonResponse({'code':400,'errmsg':'验证链接无效或已过期'})
+        # 5.根据用户id查询数据
+        try:
+            user = User.objects.get(id=user_id)
+        except (User.DoesNotExist, ValueError, TypeError):
+            return JsonResponse({'code':400,'errmsg':'用户不存在'})
+        if not user.email:
+            return JsonResponse({'code':400,'errmsg':'用户尚未设置邮箱'})
+        user.email_active = True
+        user.save(update_fields=['email_active'])
+        # 7.返回响应JSON
+        return JsonResponse({'code':0,'errmsg':'ok'})
