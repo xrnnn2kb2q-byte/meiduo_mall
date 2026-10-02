@@ -328,17 +328,15 @@ class EmailView(LoginRequiredJSONMixin,View):
         request.user.email = email
         request.user.save()
         # 4.发送一封激活邮件
-        # 一会单独讲发送邮件
         from django.core.mail import send_mail
-        # subject           主题
         subject = '美多商城激活邮件'
-        # message           邮件内容
         message = ''
-        # recipient_list    收件人列表
         recipient_list = [email]
 
-        # 邮件的内容如果是 html 这个时候使用 html_message
-        html_message = '<a href=http://www.itcast.cn>激活</a>'
+        from apps.users.utils import generic_email_verify_token
+        token = generic_email_verify_token(user_id=request.user.id)
+        verify_url = 'http://www.meiduo.site:8080/success_verify_email.html?token=%s' % token
+        html_message = '<p>请点击下面的链接验证邮箱（24 小时内有效）：</p><p><a href="%s">验证邮箱</a></p>' % verify_url
 
         send_mail(
             subject=subject,
@@ -350,6 +348,31 @@ class EmailView(LoginRequiredJSONMixin,View):
         )
         # 5.返回响应
         return JsonResponse({'code':0,'errmsg':'ok'})
+
+
+class EmailVerificationView(View):
+    """Verify the signed token from the email and activate the user's email."""
+
+    def put(self, request):
+        from apps.users.utils import check_email_verify_token
+
+        token = request.GET.get('token')
+        user_id = check_email_verify_token(token)
+        if user_id is None:
+            return JsonResponse({'code': 400, 'errmsg': '验证链接无效或已过期'})
+
+        try:
+            user = User.objects.get(id=user_id)
+        except (User.DoesNotExist, ValueError, TypeError):
+            return JsonResponse({'code': 400, 'errmsg': '用户不存在'})
+
+        if not user.email:
+            return JsonResponse({'code': 400, 'errmsg': '用户尚未设置邮箱'})
+
+        if not user.email_active:
+            user.email_active = True
+            user.save(update_fields=['email_active'])
+        return JsonResponse({'code': 0, 'errmsg': '邮箱验证成功'})
 
 """
 django项目

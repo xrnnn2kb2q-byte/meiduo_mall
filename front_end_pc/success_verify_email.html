@@ -41,12 +41,17 @@
                 success: true
             },
             created: function(){
-                axios.put(this.host+'/emails/verification/'+ window.location.search,{
+                var token = new URLSearchParams(window.location.search).get('token');
+                if (!token) {
+                    this.success = false;
+                    return;
+                }
+                axios.put(this.host + '/emails/verification/?token=' + encodeURIComponent(token), null, {
                     responseType: 'json',
-                    withCredentials:true,
+                    withCredentials: true
                 })
                     .then(response => {
-                        this.success = true;
+                        this.success = response.data.code === 0;
                     })
                     .catch(error => {
                         this.success = false;
