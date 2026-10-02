@@ -114,7 +114,24 @@ class OauthQQView(View):
             qquser = OAuthQQUser.objects.get(openid=openid)
         except OAuthQQUser.DoesNotExist:
             # 不存在
-            response = JsonResponse({'code':400,'access_token':openid})
+
+            """
+            封装的思想
+            
+            所谓的封装的思想其实就是把 一些实现了特定功能的代码 封装成一个函数（方法）
+            
+            封装的目的
+                解耦 -- 当需求发生改变的时候，对代码的修改影响比较小
+            
+            封装的步骤
+                1.把要封装的代码 定义到一个函数（方法）
+                2.优化封装的代码
+                3.验证封装的代码
+            """
+            from apps.oauth.utils import generic_openid
+            access_token = generic_openid(openid)
+
+            response = JsonResponse({'code':400,'access_token':access_token})
             return response
         else:
             # 存在
@@ -132,8 +149,14 @@ class OauthQQView(View):
         mobile = data.get('mobile')
         password = data.get('password')
         sms = data.get('sms')
-        openid = data.get('access_token')
+        access_token = data.get('access_token')
 
+        # 添加对access_token 解密
+        from apps.oauth.utils import check_openid
+        openid = check_openid(access_token)
+        if openid is None:
+            return JsonResponse({'code':400,'errmsg':'参数缺失'})
+        
         # 3.根据手机号进行用户信息的查询
         try:
             user = User.objects.get(mobile=mobile)
