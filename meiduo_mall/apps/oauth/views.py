@@ -179,3 +179,27 @@ class OauthQQView(View):
         6.完成状态保持
         7.返回响应
 """
+
+############################itsdangerous#############################
+# itsdangerous 就是为了数据加密的
+# 加密
+# 1.导入itsdangerous的类
+from django.conf import settings
+from itsdangerous import URLSafeTimedSerializer as Serializer
+# TimedJSONWebSignatureSerialier 这个类 不仅可以进行数据加密 还是可以对数据设置一个时效
+# 2.创建类的实例对象
+# secret key            秘钥
+# expires_in = None     数据的过期时间（单位为秒）
+s = Serializer(secret_key=settings.SECRET_KEY)
+# 3.加密数据
+token = s.dumps({'openid':1234567890})
+# 'eyJvcGVuaWQiOjEyMzQ1Njc4OTB9.ar9NHw.OG3fzljk7LTj7Pn9cq9pb2E_Doc'
+
+#####################################################################
+# 解密
+# 1.导入itsdangerous的类
+from itsdangerous import URLSafeTimedSerializer as Serializer
+# 2.创建类的实例对象
+s = Serializer(secret_key=settings.SECRET_KEY)
+# 3.解密数据
+s.loads(token)
