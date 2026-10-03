@@ -500,79 +500,181 @@ class EmailVerifyView(View):
         4.返回响应
     
 """
+from apps.areas.models import Area
 from apps.users.models import Address
-class AddressCreateView(LoginRequiredJSONMixin,View):
-    def post(self,request):
-        # 1.接收请求
-        data = json.loads(request.body.decode())
-        # 2.获取参数
-        receiver = data.get('receiver')
-        province_id = data.get('province_id')
-        city_id = data.get('city_id')
-        district_id = data.get('district_id')
-        place = data.get('place')
-        mobile = data.get('mobile')
-        tel = data.get('tel')
-        email = data.get('email')
 
-        user = request.user
-        # 验证参数
-        # 2.1 验证必传参数
-        # 2.2 省市区的id 是否正确
-        # 2.3 详细地址的长度
-        # 2.4 手机号
-        # 2.5 固定电话
-        # 2.6 邮箱
 
-        # 3.数据入库
-        new_address = Address.objects.create(
-            user=user,
-            title=receiver,
+def _address_to_dict(address):
+    """Serialize an address using the field names consumed by the frontend."""
+    return {
+        'id': address.id,
+        'title': address.title,
+        'receiver': address.receiver,
+        'province_id': address.province_id,
+        'city_id': address.city_id,
+        'district_id': address.district_id,
+        'province': address.province.name,
+        'city': address.city.name,
+        'district': address.district.name,
+        'place': address.place,
+        'mobile': address.mobile,
+        'tel': address.tel,
+        'email': address.email,
+    }
+
+
+def _get_address_areas(data):
+    """Resolve and validate the frontend's province_id/city_id/district_id."""
+    try:
+        province_id = int(data.get('province_id'))
+        city_id = int(data.get('city_id'))
+        district_id = int(data.get('district_id'))
+        province = Area.objects.get(id=province_id, parent__isnull=True)
+        city = Area.objects.get(id=city_id, parent_id=province.id)
+        district = Area.objects.get(id=district_id, parent_id=city.id)
+    except (Area.DoesNotExist, TypeError, ValueError):
+        return None
+    return province, city, district
+
+
+def _address_data_error(data):
+    receiver = data.get('receiver')
+    place = data.get('place')
+    mobile = data.get('mobile')
+    email = data.get('email', '') or ''
+    if not isinstance(receiver, str) or not receiver.strip() or len(receiver) > 20:
+        return '收货人不能为空且不能超过20个字符'
+    if not isinstance(place, str) or not place.strip() or len(place) > 50:
+        return '详细地址不能为空且不能超过50个字符'
+    if not isinstance(mobile, str) or not re.fullmatch(r'1[3-9]\d{9}', mobile):
+        return '手机号格式不正确'
+    if not isinstance(email, str) or len(email) > 30:
+        return '邮箱不能超过30个字符'
+    return None
+
+
+def _json_body(request):
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+class AddressCreateView(LoginRequiredJSONMixin, View):
+    def post(self, request):
+        data = _json_body(request)
+        if data is None:
+            return JsonResponse({'code': 400, 'errmsg': '请求数据格式错误'}, status=400)
+        error = _address_data_error(data)
+        if error:
+            return JsonResponse({'code': 400, 'errmsg': error}, status=400)
+        areas = _get_address_areas(data)
+        if areas is None:
+            return JsonResponse({'code': 400, 'errmsg': '省市区信息无效'}, status=400)
+
+        province, city, district = areas
+        receiver = data['receiver']
+        address = Address.objects.create(
+            user=request.user,
+            title=data.get('title') or receiver,
             receiver=receiver,
-            province_id=province_id,
-            city_id=city_id,
-            district_id=district_id,
-            place=place,
-            mobile=mobile,
-            tel=tel,
-            email=email,
+            province=province,
+            city=city,
+            district=district,
+            place=data['place'],
+            mobile=data['mobile'],
+            tel=data.get('tel', '') or '',
+            email=data.get('email', '') or '',
         )
-        address_dict = {
-            'id':new_address.id,
-            "title": new_address.title,
-            "receiver": new_address.receiver,
-            "province": new_address.province.name,
-            "city": new_address.city.name,
-            "district": new_address.district.name,
-            "place": new_address.place,
-            "mobile": new_address.mobile,
-            "tel": new_address.tel,
-            "email": new_address.email
-        }
+        return JsonResponse({'code': 0, 'errmsg': 'ok', 'address': _address_to_dict(address)})
 
-        # 4.返回响应
-        return JsonResponse({'code':0,'errmsg':'ok','address':address_dict})
 
-class AddressView(LoginRequiredJSONMixin,View):
-    def get(self,request):
-        # 1.查询指定数据
-        user = request.user
-        # addresses = user.addresses
-        addresses = Address.objects.filter(user=user,is_deleted=False)
-        # 2.将对象数据转换为字典数据
-        addresses_list = []
-        for address in addresses:
-            addresses_list.append({
-                "id": address.id,
-                "title": address.title,
-                "receiver": address.receiver,
-                "province": address.province.name,
-                "city": address.city.name,
-                "district": address.district.name,
-                "place": address.place,
-                "mobile": address.mobile,
-                "tel": address.tel,
-                "email": address.email
-            })
-        # 3.返回响应
-        return JsonResponse({'code':0,'errmsg':'ok','addresses':addresses_list})
+class AddressView(LoginRequiredJSONMixin, View):
+    def get(self, request):
+        addresses = Address.objects.filter(user=request.user, is_deleted=False).select_related(
+            'province', 'city', 'district'
+        )
+        address_list = [_address_to_dict(address) for address in addresses]
+        default_address_id = request.user.default_address_id
+        if default_address_id and not addresses.filter(id=default_address_id).exists():
+            default_address_id = None
+        return JsonResponse({
+            'code': 0,
+            'errmsg': 'ok',
+            'addresses': address_list,
+            'default_address_id': default_address_id,
+        })
+
+
+class AddressUpdateView(LoginRequiredJSONMixin, View):
+    def put(self, request, address_id):
+        address = Address.objects.filter(
+            id=address_id, user=request.user, is_deleted=False
+        ).first()
+        if address is None:
+            return JsonResponse({'code': 404, 'errmsg': '地址不存在'}, status=404)
+
+        data = _json_body(request)
+        if data is None:
+            return JsonResponse({'code': 400, 'errmsg': '请求数据格式错误'}, status=400)
+        error = _address_data_error(data)
+        if error:
+            return JsonResponse({'code': 400, 'errmsg': error}, status=400)
+        areas = _get_address_areas(data)
+        if areas is None:
+            return JsonResponse({'code': 400, 'errmsg': '省市区信息无效'}, status=400)
+
+        address.title = data.get('title') or data['receiver']
+        address.receiver = data['receiver']
+        address.province, address.city, address.district = areas
+        address.place = data['place']
+        address.mobile = data['mobile']
+        address.tel = data.get('tel', '') or ''
+        address.email = data.get('email', '') or ''
+        address.save()
+        return JsonResponse({'code': 0, 'errmsg': 'ok', 'address': _address_to_dict(address)})
+
+    def delete(self, request, address_id):
+        address = Address.objects.filter(
+            id=address_id, user=request.user, is_deleted=False
+        ).first()
+        if address is None:
+            return JsonResponse({'code': 404, 'errmsg': '地址不存在'}, status=404)
+
+        if request.user.default_address_id == address.id:
+            request.user.default_address = None
+            request.user.save(update_fields=['default_address'])
+        address.is_deleted = True
+        address.save(update_fields=['is_deleted'])
+        return JsonResponse({'code': 0, 'errmsg': 'ok'})
+
+
+class AddressDefaultView(LoginRequiredJSONMixin, View):
+    def put(self, request, address_id):
+        address = Address.objects.filter(
+            id=address_id, user=request.user, is_deleted=False
+        ).first()
+        if address is None:
+            return JsonResponse({'code': 404, 'errmsg': '地址不存在'}, status=404)
+        request.user.default_address = address
+        request.user.save(update_fields=['default_address'])
+        return JsonResponse({'code': 0, 'errmsg': 'ok'})
+
+
+class AddressTitleView(LoginRequiredJSONMixin, View):
+    def put(self, request, address_id):
+        address = Address.objects.filter(
+            id=address_id, user=request.user, is_deleted=False
+        ).first()
+        if address is None:
+            return JsonResponse({'code': 404, 'errmsg': '地址不存在'}, status=404)
+        data = _json_body(request)
+        if data is None:
+            return JsonResponse({'code': 400, 'errmsg': '请求数据格式错误'}, status=400)
+        title = data.get('title')
+        if not isinstance(title, str) or not title.strip() or len(title) > 20:
+            return JsonResponse({'code': 400, 'errmsg': '地址标题不能为空且不能超过20个字符'}, status=400)
+        address.title = title.strip()
+        address.save(update_fields=['title'])
+        return JsonResponse({'code': 0, 'errmsg': 'ok', 'title': address.title})
