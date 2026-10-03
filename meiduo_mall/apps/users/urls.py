@@ -1,6 +1,6 @@
 from django.urls import path
 from apps.users.views import UsernameCountView, MobileCountView, RegisterView, LoginView, LogoutView, CenterView, \
-    EmailView, EmailVerifyView, AddressCreateView
+    EmailView, EmailVerifyView, AddressCreateView, AddressView
 
 urlpatterns = [
     # 判断用户名是否重复
@@ -13,4 +13,5 @@ urlpatterns = [
     path('emails/',EmailView.as_view()),
     path('emails/verification/',EmailVerifyView.as_view()),
     path('addresses/create/',AddressCreateView.as_view()),
+    path('addresses/',AddressView.as_view()),
 ]
