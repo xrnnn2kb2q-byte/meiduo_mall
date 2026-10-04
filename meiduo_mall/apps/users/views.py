@@ -1,3 +1,5 @@
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.hashers import check_password
 from django.shortcuts import render
 from django.views import View
 import json
@@ -678,3 +680,30 @@ class AddressTitleView(LoginRequiredJSONMixin, View):
         address.title = title.strip()
         address.save(update_fields=['title'])
         return JsonResponse({'code': 0, 'errmsg': 'ok', 'title': address.title})
+
+class PasswordResetView(LoginRequiredJSONMixin, View):
+    def put(self, request):
+        user = request.user
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return JsonResponse({'code': 400, 'status': 400, 'errmsg': '请求数据格式错误'})
+        if not isinstance(data, dict):
+            return JsonResponse({'code': 400, 'status': 400, 'errmsg': '请求数据格式错误'})
+
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
+        new_password2 = data.get('new_password2')
+        if not all(isinstance(value, str) and value for value in (
+            old_password, new_password, new_password2
+        )):
+            return JsonResponse({'code': 400, 'status': 400, 'errmsg': '请填写完整的密码信息'})
+        if not check_password(old_password, user.password):
+            return JsonResponse({'code': 400, 'status': 400, 'errmsg': '当前密码错误'})
+        if not re.fullmatch(r'[0-9A-Za-z]{8,20}', new_password):
+            return JsonResponse({'code': 400, 'status': 400, 'errmsg': '新密码须为8到20位字母或数字'})
+        if new_password != new_password2:
+            return JsonResponse({'code': 400, 'status': 400, 'errmsg': '两次输入的密码不一致'})
+        user.set_password(new_password)
+        user.save()
+        return JsonResponse({'code': 0, 'errmsg': 'ok'})
