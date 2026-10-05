@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'apps.oauth',
     'apps.areas',
-    'apps.goods'
+    'apps.goods',
+    'apps.contents'
 ]
 
 MIDDLEWARE = [
@@ -137,6 +138,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Uploaded product images are stored in <project>/media/goods/.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Email

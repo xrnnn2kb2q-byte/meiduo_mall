@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path, include, register_converter
+from django.conf import settings
+from django.conf.urls.static import static
 
 
 # def log(request):
@@ -49,4 +51,8 @@ urlpatterns = [
     path('',include('apps.verifications.urls')),
     path('',include('apps.oauth.urls')),
     path('',include('apps.areas.urls')),
+    path('', include('apps.goods.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
