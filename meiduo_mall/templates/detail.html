@@ -2,45 +2,49 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
-    <title>美多商城-商品详情</title>
-    <link rel="stylesheet" type="text/css" href="http://www.meiduo.site:8080/css/reset.css">
-    <link rel="stylesheet" type="text/css" href="http://www.meiduo.site:8080/css/main.css">
-    <script type="text/javascript" src="http://www.meiduo.site:8080/js/host.js"></script>
-    <script type="text/javascript" src="http://www.meiduo.site:8080/js/vue-2.5.16.js"></script>
-    <script type="text/javascript" src="http://www.meiduo.site:8080/js/axios-0.18.0.min.js"></script>
+    <title>{{ sku.name }} - 美多商城</title>
+    <link rel="stylesheet" type="text/css" href="{{ frontend_url }}/css/reset.css">
+    <link rel="stylesheet" type="text/css" href="{{ frontend_url }}/css/main.css">
+    <style>
+        .goods_num .num_add button { padding: 0; cursor: pointer; background: #fff; border-top: 0; }
+        .operate_btn button.add_cart { padding: 0; cursor: not-allowed; opacity: .65; }
+    </style>
 </head>
 <body>
-    <div id="app" v-cloak>
+    <div>
     <div class="header_con">
         <div class="header">
             <div class="welcome fl">欢迎来到美多商城!</div>
             <div class="fr">
-                <div v-if="username" class="login_btn fl">
-                    欢迎您：<em>[[ username ]]</em>
+                {% if user.is_authenticated %}
+                <div class="login_btn fl">
+                    欢迎您：<em>{{ user.username }}</em>
                     <span>|</span>
-                    <a @click="logoutfunc">退出</a>
+                    <a href="{{ frontend_url }}/index.html">商城首页</a>
                 </div>
-                <div v-else class="login_btn fl">
-                    <a href="/login.html">登录</a>
+                {% else %}
+                <div class="login_btn fl">
+                    <a href="{{ frontend_url }}/login.html">登录</a>
                     <span>|</span>
-                    <a href="/register.html">注册</a>
+                    <a href="{{ frontend_url }}/register.html">注册</a>
                 </div>
+                {% endif %}
                 <div class="user_link fl">
                     <span>|</span>
-                    <a href="/user_center_info.html">用户中心</a>
+                    <a href="{{ frontend_url }}/user_center_info.html">用户中心</a>
                     <span>|</span>
-                    <a href="/cart.html">我的购物车</a>
+                    <a href="{{ frontend_url }}/cart.html">我的购物车</a>
                     <span>|</span>
-                    <a href="/user_center_order.html">我的订单</a>
+                    <a href="{{ frontend_url }}/user_center_order.html">我的订单</a>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="search_bar clearfix">
-            <a href="/index.html" class="logo fl"><img src="/images/logo.png"></a>
+            <a href="{{ frontend_url }}/index.html" class="logo fl"><img src="{{ frontend_url }}/images/logo.png" alt="美多商城"></a>
             <div class="search_wrap fl">
-                <form method="get" action="/search.html" class="search_con">
+                <form method="get" action="{{ frontend_url }}/search.html" class="search_con">
                     <input type="text" class="input_text fl" name="q" placeholder="搜索商品">
                     <input type="submit" class="input_btn fr" name="" value="搜索">
                 </form>
@@ -53,31 +57,9 @@
             </div>
 
             <div class="guest_cart fr">
-            <a href="#" class="cart_name fl">我的购物车</a>
-            <div class="goods_count fl" id="show_count">15</div>
-
-            <ul class="cart_goods_show">
-                <li>
-                    <img src="#" alt="商品图片">
-                    <h4>商品名称手机</h4>
-                    <div>4</div>
-                </li>
-                <li>
-                    <img src="#" alt="商品图片">
-                    <h4>商品名称手机</h4>
-                    <div>5</div>
-                </li>
-                <li>
-                    <img src="#" alt="商品图片">
-                    <h4>商品名称手机</h4>
-                    <div>6</div>
-                </li>
-                <li>
-                    <img src="#" alt="商品图片">
-                    <h4>商品名称手机</h4>
-                    <div>6</div>
-                </li>
-            </ul>
+            <a href="{{ frontend_url }}/cart.html" class="cart_name fl">我的购物车</a>
+            <div class="goods_count fl" id="show_count">0</div>
+            <ul class="cart_goods_show"><li>购物车内容请前往购物车页面查看</li></ul>
         </div>
 
         </div>
@@ -100,7 +82,7 @@
                                         <div class="group_name fl">{{cat2.name}} &gt;</div>
                                         <div class="group_detail fl">
                                             {% for cat3 in cat2.sub_cats %}
-                                            <a href="/list.html?cat={{cat3.id}}">{{cat3.name}}</a>
+                                            <a href="{{ frontend_url }}/list.html?cat={{cat3.id}}">{{cat3.name}}</a>
                                             {% endfor %}
                                         </div>
                                     </div>
@@ -112,7 +94,7 @@
                     </div>
 
                     <ul class="navlist fl">
-                        <li><a href="">首页</a></li>
+                        <li><a href="{{ frontend_url }}/index.html">首页</a></li>
                         <li class="interval">|</li>
                         <li><a href="">真划算</a></li>
                         <li class="interval">|</li>
@@ -122,26 +104,27 @@
             </div>
 
     <div class="breadcrumb">
-        {% if breadcrumb.cat1 %}<a href="{{ breadcrumb.cat1_url }}">{{ breadcrumb.cat1 }}</a>{% endif %}
-        {% if breadcrumb.cat2 %}<span>&gt;</span><a href="{{ breadcrumb.cat2_url }}">{{ breadcrumb.cat2 }}</a>{% endif %}
-        {% if breadcrumb.cat3 %}<span>&gt;</span><a href="{{ breadcrumb.cat3_url }}">{{ breadcrumb.cat3 }}</a>{% endif %}
+        {% if breadcrumb.cat1 %}<a href="{{ frontend_url }}{{ breadcrumb.cat1_url }}">{{ breadcrumb.cat1 }}</a>{% endif %}
+        {% if breadcrumb.cat2 %}<span>&gt;</span><a href="{{ frontend_url }}{{ breadcrumb.cat2_url }}">{{ breadcrumb.cat2 }}</a>{% endif %}
+        {% if breadcrumb.cat3 %}<span>&gt;</span><a href="{{ frontend_url }}{{ breadcrumb.cat3_url }}">{{ breadcrumb.cat3 }}</a>{% endif %}
     </div>
 
     <div class="goods_detail_con clearfix">
-        <div class="goods_detail_pic fl"><img src="{{ sku.default_image.url }}"></div>
+        <div class="goods_detail_pic fl"><img src="{{ sku_image_url }}" alt="{{ sku.name }}" onerror="this.onerror=null;this.src='{{ sku_fallback_image_url }}'"></div>
         <div class="goods_detail_list fr">
             <h3>{{ sku.name }}</h3>
             <p>{{ sku.caption }}</p>
             <div class="prize_bar">
                 <span class="show_pirze">¥<em>{{ sku.price }}</em></span><span> 市场价￥{{sku.market_price}}</span>
-                <a href="javascript:;" class="goods_judge">{{ sku.comments }}人评价</a>
+                <a href="#tab_comment" class="goods_judge" data-open-tab="comment">{{ sku.comments }}人评价</a>
             </div>
+            <p>库存：{{ sku.stock }}　销量：{{ sku.sales }}　{% if sku.stock %}<strong>有货</strong>{% else %}<strong>暂时缺货</strong>{% endif %}</p>
             <div class="goods_num clearfix">
                 <div class="num_name fl">数 量：</div>
                 <div class="num_add fl">
-                    <input v-model="sku_count" type="text" class="num_show fl">
-                    <a @click="sku_count++" class="add fr">+</a>
-                    <a @click="on_minus()" class="minus fr">-</a>
+                    <input id="sku_count" type="number" min="1" max="{{ sku.stock }}" value="1" class="num_show fl">
+                    <button type="button" id="quantity_add" class="add fr" aria-label="增加数量">+</button>
+                    <button type="button" id="quantity_minus" class="minus fr" aria-label="减少数量">-</button>
                 </div>
             </div>
             {% for spec in specs %}
@@ -149,18 +132,18 @@
                 <label>{{ spec.name }}:</label>
                 {% for option in spec.spec_options %}
                 {% if option.sku_id == sku.id %}
-                <a href="javascript:;" class="select">{{ option.value }}</a>
+                <a href="javascript:;" class="select" aria-current="true">{{ option.value }}</a>
                 {% elif option.sku_id %}
-                <a href="/goods/{{option.sku_id}}.html">{{ option.value }}</a>
+                <a href="/detail/{{option.sku_id}}/">{{ option.value }}</a>
                 {% else %}
-                <a href="javascript:;">{{ option.value }}</a>
+                <span>{{ option.value }}</span>
                 {% endif %}
                 {% endfor %}
             </div>
             {% endfor %}
-            <div class="total">总价：<em>[[sku_amount]]元</em></div>
+            <div class="total">总价：<em>￥<span id="sku_total">{{ sku.price }}</span></em></div>
             <div class="operate_btn">
-                <a @click="add_cart" class="add_cart" id="add_cart">加入购物车</a>
+                <button type="button" class="add_cart" id="add_cart" disabled title="当前项目尚未提供购物车接口">加入购物车</button>
             </div>
         </div>
     </div>
@@ -170,51 +153,43 @@
             <div class="new_goods">
                 <h3>热销排行</h3>
                 <ul>
-                    <li v-for="sku in hot_skus">
-                        <a :href="sku.url"><img :src="sku.default_image_url"></a>
-                        <h4><a :href="sku.url">[[sku.name]]</a></h4>
-                        <div class="prize">￥[[sku.price]]</div>
+                    {% for hot_sku in hot_skus %}
+                    <li>
+                        <a href="/detail/{{ hot_sku.id }}/"><img src="{{ hot_sku.image_url }}" alt="{{ hot_sku.name }}" onerror="this.onerror=null;this.src='{{ hot_sku.fallback_image_url }}'"></a>
+                        <h4><a href="/detail/{{ hot_sku.id }}/">{{ hot_sku.name }}</a></h4>
+                        <div class="prize">￥{{ hot_sku.price }}</div>
                     </li>
+                    {% empty %}<li>暂无热销商品</li>{% endfor %}
                 </ul>
             </div>
         </div>
 
         <div class="r_wrap fr clearfix">
             <ul class="detail_tab clearfix">
-                <li @click="on_tab_content('detail')" :class="tab_content.detail?'active':''">商品详情</li>
-                <li @click="on_tab_content('pack')" :class="tab_content.pack?'active':''">规格与包装</li>
-                <li @click="on_tab_content('comment')" :class="tab_content.comment?'active':''">商品评价([[comments.length]])</li>
-                <li @click="on_tab_content('service')" :class="tab_content.service?'active':''">售后服务</li>
+                <li class="active" data-tab="detail">商品详情</li>
+                <li data-tab="pack">规格与包装</li>
+                <li data-tab="comment">商品评价（{{ sku.comments }}）</li>
+                <li data-tab="service">售后服务</li>
             </ul>
-            <div @click="on_tab_content('detail')" class="tab_content" :class="tab_content.detail?'current':''">
+            <div id="tab_detail" class="tab_content current">
                 <dl>
                     <dt>商品详情：</dt>
-                    <dd>{{ sku.spu.desc_detail|safe }}</dd>
+                    <dd>{{ sku.spu.desc_detail|default:'暂无商品详情'|safe }}</dd>
                 </dl>
             </div>
-            <div @click="on_tab_content('pack')" class="tab_content" :class="tab_content.pack?'current':''">
+            <div id="tab_pack" class="tab_content">
                 <dl>
                     <dt>规格与包装：</dt>
-                    <dd>{{ sku.spu.desc_pack|safe }}</dd>
+                    <dd>{{ sku.spu.desc_pack|default:'暂无包装信息'|safe }}</dd>
                 </dl>
             </div>
-            <div @click="on_tab_content('comment')" class="tab_content" :class="tab_content.comment?'current':''">
-                <ul class="judge_list_con">
-                    <li class="judge_list fl" v-for="comment in comments">
-                        <div class="user_info fl">
-                            <b>[[comment.username]]</b>
-                        </div>
-                        <div class="judge_info fl">
-                            <div :class="comment.score_class"></div>
-                            <div class="judge_detail">[[comment.comment]]</div>
-                        </div>
-                    </li>
-                </ul>
+            <div id="tab_comment" class="tab_content">
+                <p>当前累计 {{ sku.comments }} 条评价。评价详情功能暂未接入。</p>
             </div>
-            <div @click="on_tab_content('service')" class="tab_content" :class="tab_content.service?'current':''">
+            <div id="tab_service" class="tab_content">
                 <dl>
                     <dt>售后服务：</dt>
-                    <dd>{{ sku.spu.desc_service|safe }}</dd>
+                    <dd>{{ sku.spu.desc_service|default:'暂无售后服务说明'|safe }}</dd>
                 </dl>
             </div>
         </div>
@@ -234,11 +209,57 @@
         <p>电话：010-****888    京ICP备*******8号</p>
     </div>
     </div>
-    <script type="text/javascript">
-        var price = {{sku.price}};
-        var cat = {{ sku.category.id }};
+    <script>
+        (function () {
+            var tabButtons = document.querySelectorAll('.detail_tab li[data-tab]');
+            var tabPanels = document.querySelectorAll('.tab_content[id^="tab_"]');
+            function activateTab(name) {
+                tabButtons.forEach(function (button) {
+                    button.classList.toggle('active', button.dataset.tab === name);
+                });
+                tabPanels.forEach(function (panel) {
+                    panel.classList.toggle('current', panel.id === 'tab_' + name);
+                });
+            }
+            tabButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    activateTab(button.dataset.tab);
+                });
+            });
+            document.querySelectorAll('[data-open-tab]').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    activateTab(link.dataset.openTab);
+                });
+            });
+
+            var quantity = document.getElementById('sku_count');
+            var total = document.getElementById('sku_total');
+            var add = document.getElementById('quantity_add');
+            var minus = document.getElementById('quantity_minus');
+            var available = Number(quantity.max) || 0;
+            var unitPrice = Number('{{ sku.price }}');
+            function updateQuantity(value) {
+                if (!available) {
+                    quantity.value = 0;
+                    quantity.disabled = true;
+                    add.disabled = true;
+                    minus.disabled = true;
+                    return;
+                }
+                quantity.value = Math.max(1, Math.min(available, Number(value) || 1));
+                total.textContent = (unitPrice * Number(quantity.value)).toFixed(2);
+            }
+            add.addEventListener('click', function () {
+                updateQuantity(Number(quantity.value) + 1);
+            });
+            minus.addEventListener('click', function () {
+                updateQuantity(Number(quantity.value) - 1);
+            });
+            quantity.addEventListener('change', function () {
+                updateQuantity(quantity.value);
+            });
+            updateQuantity(quantity.value);
+        })();
     </script>
-    <script type="text/javascript" src="http://www.meiduo.site:8080/js/common.js"></script>
-    <script type="text/javascript" src="http://www.meiduo.site:8080/js/detail.js"></script>
 </body>
 </html>

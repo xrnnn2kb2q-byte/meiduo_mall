@@ -109,7 +109,7 @@ var vm = new Vue({
                     var results = response.data;
                     for(var i=0; i< results.length; i++){
                         var sku = results[i];
-                        sku.url = '/goods/' + sku.id + ".html";
+                        sku.url = this.host + '/detail/' + sku.id + '/';
                         this.searchkey = sku.searchkey
                         this.skus.push(sku);
                         this.page_size = sku.page_size;

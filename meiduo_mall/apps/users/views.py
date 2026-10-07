@@ -1,10 +1,12 @@
+import redis
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.hashers import check_password
 from django.shortcuts import render
 from django.views import View
 import json
 from django.conf import settings
-
+from django_redis import get_redis_connection
+from apps.goods.models import SKU
 from celery_tasks.email.tasks import celery_send_email
 
 # Create your views here.
@@ -707,3 +709,45 @@ class PasswordResetView(LoginRequiredJSONMixin, View):
         user.set_password(new_password)
         user.save()
         return JsonResponse({'code': 0, 'errmsg': 'ok'})
+
+"""
+添加浏览记录
+    前端：
+        当登录用户，访问某一个具体SKU页面的时候，发送一个axios请求，请求携带 sku_id
+    
+    后端：
+        请求：             接受请求，获取请求参数，验证参数
+        业务逻辑：          连接redis，先去重，再保存到redis中，只保存5条记录
+        响应：             返回JSON
+        路由：             POST        browse_histories
+        步骤：
+            1.接受请求
+            2.获取请求参数
+            3.验证参数
+            4.连接redis
+            5.去重
+            6.保存到redis中
+            7.只保存5条记录
+            8.返回JSON
+"""
+
+class UserHistoryView(LoginRequiredJSONMixin,View):
+    def post(self,request):
+        user = request.user
+        data = json.loads(request.body.decode())
+        sku_id = data.get('sku_id')
+        try:
+            sku = SKU.objects.get(id=sku_id)
+        except SKU.DoesNotExist:
+            return JsonResponse({'code':400,'errmsg':'没有此商品'})
+
+        redis_cli = get_redis_connection('history')
+
+        # 去重，先删除这个商品id数据，再添加就可以了
+        redis_cli.lrem('history_%s' % user.id, sku_id)
+        # 保存到redis中
+        redis_cli.lpush('history_%s' % user.id,sku_id,)
+        # 只保存5条记录
+        redis_cli.ltrim('history_%s' % user.id,0,4)
+
+        return JsonResponse({'code':0,'errmsg':'ok'})

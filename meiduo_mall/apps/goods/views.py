@@ -2,7 +2,10 @@ from django.shortcuts import render
 from django import forms
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.http import Http404, JsonResponse
+import mimetypes
+from pathlib import Path
+
+from django.http import FileResponse, Http404, JsonResponse
 from django.views import View
 
 from apps.goods.models import GoodsChannel, SKU, SKUSpecification, GoodsCategory
@@ -89,16 +92,8 @@ def get_goods_specs(sku):
     return result
 
 
-def _sku_image_url(request, sku):
-    """Return a locally served image for this SKU."""
-    image = sku.default_image
-    # Uploaded ImageField files are stored under MEDIA_ROOT and should always
-    # take precedence over compatibility images.
-    if image and default_storage.exists(image.name):
-        return request.build_absolute_uri(image.url)
-
-    # Imported records may still contain unavailable FastDFS paths. Pick only
-    # a local image from the same product type instead of reusing a random one.
+def _sku_fallback_image_url(sku):
+    """Use a product-family fallback from the frontend's local image assets."""
     product_text = sku.name.casefold()
     category = sku.category
     category_names = []
@@ -122,11 +117,34 @@ def _sku_image_url(request, sku):
     else:
         image_name = 'no_image.svg'
 
-    image_path = f'goods/{image_name}'
-    if not default_storage.exists(image_path):
-        return ''
-    image_url = f'{settings.MEDIA_URL.rstrip("/")}/{image_path}'
-    return request.build_absolute_uri(image_url)
+    if image_name.startswith('fallback_'):
+        image_name = image_name.replace('fallback_', 'goods', 1)
+    return f'{settings.BACKEND_URL}/goods/images/{image_name}'
+
+
+def _sku_image_url(sku):
+    """Prefer the uploaded local image; otherwise use a local fallback asset."""
+    image = sku.default_image
+    if image and default_storage.exists(image.name):
+        return f'{settings.BACKEND_URL}/{image.url.lstrip("/")}'
+    return _sku_fallback_image_url(sku)
+
+
+class LocalGoodsImageView(View):
+    """Serve the project's bundled product images from the Django host."""
+
+    allowed_images = {f'goods{number:03d}.jpg' for number in range(1, 10)} | {'no_image.svg'}
+
+    def get(self, request, image_name):
+        if image_name not in self.allowed_images:
+            raise Http404('商品图片不存在')
+
+        image_path = settings.BASE_DIR.parent / 'front_end_pc' / 'images' / 'goods' / image_name
+        if not image_path.is_file():
+            raise Http404('商品图片不存在')
+
+        content_type, _ = mimetypes.guess_type(image_path.name)
+        return FileResponse(image_path.open('rb'), content_type=content_type or 'application/octet-stream')
 
 # Create your views here.
 
@@ -226,7 +244,7 @@ class ListView(View):
                 'name': sku.name,
                 'price': str(sku.price),
                 'comments': sku.comments,
-                'default_image_url': _sku_image_url(request, sku),
+                'default_image_url': _sku_image_url(sku),
             })
 
         breadcrumb = get_bread_crump(category)
@@ -255,7 +273,7 @@ class HotSKUView(View):
                 'name': sku.name,
                 'price': str(sku.price),
                 'sales': sku.sales,
-                'default_image_url': _sku_image_url(request, sku),
+                'default_image_url': _sku_image_url(sku),
             })
 
         return JsonResponse({'code': 0, 'errmsg': 'ok', 'hot_skus': results})
@@ -310,10 +328,21 @@ class DetailView(View):
         except SKU.DoesNotExist:
             raise Http404('商品不存在')
 
+        hot_skus = SKU.objects.filter(category=sku.category).exclude(
+            pk=sku.pk
+        ).order_by('-sales', '-id')[:5]
+        for hot_sku in hot_skus:
+            hot_sku.image_url = _sku_image_url(hot_sku)
+            hot_sku.fallback_image_url = _sku_fallback_image_url(hot_sku)
+
         context = {
             'categories': get_categories(),
             'breadcrumb': get_bread_crump(sku.category),
+            'frontend_url': settings.FRONTEND_URL,
             'sku': sku,
+            'sku_image_url': _sku_image_url(sku),
+            'sku_fallback_image_url': _sku_fallback_image_url(sku),
             'specs': get_goods_specs(sku),
+            'hot_skus': hot_skus,
         }
         return render(request, 'detail.html', context)

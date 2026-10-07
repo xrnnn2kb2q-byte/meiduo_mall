@@ -73,7 +73,7 @@ ROOT_URLCONF = 'meiduo_mall.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -142,6 +142,8 @@ STATIC_URL = 'static/'
 # Uploaded product images are stored in <project>/media/goods/.
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://www.meiduo.site:8080').rstrip('/')
+BACKEND_URL = os.environ.get('BACKEND_URL', 'http://www.meiduo.site:8000').rstrip('/')
 
 
 # Email
@@ -178,6 +180,13 @@ CACHES = {
     "code": {  # 用于保存session数据
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": "redis://127.0.0.1:6379/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+    "history": {  # 用于保存浏览记录数据
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/3",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }

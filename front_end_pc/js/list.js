@@ -126,7 +126,7 @@ var vm = new Vue({
                     this.cat3.name = response.data.breadcrumb.cat3;
                     this.cat3.url = response.data.breadcrumb.cat3_url;
                     for(var i=0; i<this.skus.length; i++){
-                        this.skus[i].url = '/goods/' + this.skus[i].id + ".html";
+                        this.skus[i].url = this.host + '/detail/' + this.skus[i].id + '/';
                     }
                 })
                 .catch(error => {
@@ -180,7 +180,7 @@ var vm = new Vue({
                 .then(response => {
                      this.hot_skus = response.data.hot_skus
                      for(let i=0; i<this.hot_skus.length; i++){
-                        this.hot_skus[i].url = '/goods/' + this.hot_skus[i].id + ".html";
+                        this.hot_skus[i].url = this.host + '/detail/' + this.hot_skus[i].id + '/';
                     }
                 })
                 .catch(error => {
