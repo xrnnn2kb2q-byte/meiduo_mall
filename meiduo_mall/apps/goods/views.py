@@ -1,10 +1,132 @@
 from django.shortcuts import render
 from django import forms
-from django.http import JsonResponse
+from django.conf import settings
+from django.core.files.storage import default_storage
+from django.http import Http404, JsonResponse
 from django.views import View
 
-from apps.goods.models import SKU
+from apps.goods.models import GoodsChannel, SKU, SKUSpecification, GoodsCategory
 from utils.views import LoginRequiredJSONMixin
+
+
+def get_bread_crump(category):
+    """Build the category path used by the list and detail page breadcrumbs."""
+    ancestors = []
+    parent = category.parent
+    while parent:
+        ancestors.append(parent)
+        parent = parent.parent
+    category_path = (list(reversed(ancestors)) + [category])[:3]
+
+    breadcrumb = {}
+    for index, key in enumerate(('cat1', 'cat2', 'cat3')):
+        if index < len(category_path):
+            item = category_path[index]
+            breadcrumb[key] = item.name
+            breadcrumb[f'{key}_url'] = f'/list.html?cat={item.id}'
+        else:
+            breadcrumb[key] = ''
+            breadcrumb[f'{key}_url'] = ''
+    return breadcrumb
+
+
+def get_categories():
+    """Build the navigation structure expected by the category menu template."""
+    categories = {}
+    channels = GoodsChannel.objects.select_related(
+        'group', 'category'
+    ).order_by('group_id', 'sequence')
+
+    for channel in channels:
+        group = categories.setdefault(channel.group_id, {
+            'channels': [],
+            'sub_cats': [],
+        })
+        group['channels'].append({
+            'name': channel.category.name,
+            'url': channel.url,
+        })
+        group['sub_cats'].extend([
+            {
+                'id': category.id,
+                'name': category.name,
+                'sub_cats': category.subs.all(),
+            }
+            for category in channel.category.subs.prefetch_related('subs')
+        ])
+    return categories
+
+
+def get_goods_specs(sku):
+    """Return specification options and their SKU links for a detail page."""
+    result = []
+    specs = sku.spu.specs.prefetch_related('options').all()
+    for spec in specs:
+        sku_by_option = {}
+        links = SKUSpecification.objects.filter(
+            spec=spec,
+            sku__spu=sku.spu,
+        ).order_by('sku_id').values_list('option_id', 'sku_id')
+        for option_id, sku_id in links:
+            sku_by_option.setdefault(option_id, sku_id)
+        current_option_id = SKUSpecification.objects.filter(
+            sku=sku,
+            spec=spec,
+        ).values_list('option_id', flat=True).first()
+        if current_option_id is not None:
+            sku_by_option[current_option_id] = sku.id
+
+        result.append({
+            'name': spec.name,
+            'spec_options': [
+                {
+                    'value': option.value,
+                    'sku_id': sku_by_option.get(option.id),
+                }
+                for option in spec.options.all()
+            ],
+        })
+    return result
+
+
+def _sku_image_url(request, sku):
+    """Return a locally served image for this SKU."""
+    image = sku.default_image
+    # Uploaded ImageField files are stored under MEDIA_ROOT and should always
+    # take precedence over compatibility images.
+    if image and default_storage.exists(image.name):
+        return request.build_absolute_uri(image.url)
+
+    # Imported records may still contain unavailable FastDFS paths. Pick only
+    # a local image from the same product type instead of reusing a random one.
+    product_text = sku.name.casefold()
+    category = sku.category
+    category_names = []
+    while category:
+        category_names.append(category.name.casefold())
+        category = category.parent
+    product_text += ' ' + ' '.join(category_names)
+
+    if any(word in product_text for word in ('抽纸', '纸巾', '面巾纸', '卫生纸')):
+        image_name = 'fallback_009.jpg'
+    elif any(word in product_text for word in ('路由器', '路由', 'router')):
+        image_name = 'fallback_007.jpg'
+    elif any(word in product_text for word in ('笔记本', '电脑', 'macbook', 'laptop')):
+        image_name = 'fallback_008.jpg'
+    elif any(word in product_text for word in ('平板', 'ipad', 'tablet')):
+        image_name = 'fallback_006.jpg'
+    elif any(word in product_text for word in ('手机', 'iphone', 'huawei', '华为', 'apple')):
+        # Local files 001–005 are phone product photos. Vary them by SKU so
+        # the hot ranking does not repeat the exact same thumbnail.
+        image_name = f'fallback_{(sku.id - 1) % 5 + 1:03d}.jpg'
+    else:
+        image_name = 'no_image.svg'
+
+    image_path = f'goods/{image_name}'
+    if not default_storage.exists(image_path):
+        return ''
+    image_url = f'{settings.MEDIA_URL.rstrip("/")}/{image_path}'
+    return request.build_absolute_uri(image_url)
 
 # Create your views here.
 
@@ -72,3 +194,126 @@ class SKUImageUploadView(LoginRequiredJSONMixin, View):
             'sku_id': sku.id,
             'image': sku.default_image.url,
         })
+
+class ListView(View):
+    def get(self, request, category_id):
+        try:
+            category = GoodsCategory.objects.get(id=category_id)
+        except GoodsCategory.DoesNotExist:
+            return JsonResponse({'code': 404, 'errmsg': '商品类别不存在'}, status=404)
+
+        ordering = request.GET.get('ordering', '-create_time')
+        if ordering not in {'-create_time', 'price', '-sales'}:
+            ordering = '-create_time'
+        try:
+            page_size = min(max(int(request.GET.get('page_size', 5)), 1), 100)
+            page = max(int(request.GET.get('page', 1)), 1)
+        except (TypeError, ValueError):
+            return JsonResponse({'code': 400, 'errmsg': '分页参数无效'}, status=400)
+
+        skus = SKU.objects.filter(category_id=category_id).order_by(ordering, '-id')
+        from django.core.paginator import Paginator, EmptyPage
+        paginator = Paginator(skus, page_size)
+        try:
+            page_skus = paginator.page(page)
+        except EmptyPage:
+            page_skus = paginator.page(paginator.num_pages or 1)
+
+        sku_list = []
+        for sku in page_skus.object_list:
+            sku_list.append({
+                'id': sku.id,
+                'name': sku.name,
+                'price': str(sku.price),
+                'comments': sku.comments,
+                'default_image_url': _sku_image_url(request, sku),
+            })
+
+        breadcrumb = get_bread_crump(category)
+
+        return JsonResponse({
+            'code': 0,
+            'errmsg': 'ok',
+            'list': sku_list,
+            'count': paginator.num_pages,
+            'breadcrumb': breadcrumb,
+        })
+
+
+class HotSKUView(View):
+    """Return the top selling SKUs in a category for the list page."""
+
+    def get(self, request, category_id):
+        if not GoodsCategory.objects.filter(pk=category_id).exists():
+            return JsonResponse({'code': 404, 'errmsg': '商品类别不存在'}, status=404)
+
+        hot_skus = SKU.objects.filter(category_id=category_id).order_by('-sales', '-id')[:5]
+        results = []
+        for sku in hot_skus:
+            results.append({
+                'id': sku.id,
+                'name': sku.name,
+                'price': str(sku.price),
+                'sales': sku.sales,
+                'default_image_url': _sku_image_url(request, sku),
+            })
+
+        return JsonResponse({'code': 0, 'errmsg': 'ok', 'hot_skus': results})
+
+"""
+搜索：
+
+1.我们不使用like
+
+2.我们使用 全文检索
+    全文检索即在指定的任意字段中进行检索查询
+    
+3.全文检索方案需要配合搜索引擎来实现
+
+4.搜索引擎
+    原理：关键词与词条的对应关系，并记录词条的位置。
+
+1. --- 我爱北京天安门                      我爱，北京，天安门
+
+2. --- 王红，我爱你，我想你想的睡不着觉       王红，我爱，我爱你，睡不着觉，想你
+
+3. ---我睡不着觉                          我，睡不着觉
+
+    我爱
+    
+5.Elasticsearch
+    进行分词操作
+    分词是指将一句话插接成多个单字或词，这些字或词便是这句话的关键词
+    
+    下雨天 留客天 天留我不留
+
+"""
+
+"""
+需求：
+    详情页面
+    
+    1.分类数据
+    2.面包屑
+    3.SKU信息
+    4.规格信息
+
+    我们的详情页面也是需要静态化实现的，但是我们在讲解静态化之前，应该可以先把 详情页面的数据展示出来
+"""
+
+class DetailView(View):
+    def get(self, request, sku_id):
+        try:
+            sku = SKU.objects.select_related(
+                'spu', 'category__parent__parent'
+            ).get(id=sku_id)
+        except SKU.DoesNotExist:
+            raise Http404('商品不存在')
+
+        context = {
+            'categories': get_categories(),
+            'breadcrumb': get_bread_crump(sku.category),
+            'sku': sku,
+            'specs': get_goods_specs(sku),
+        }
+        return render(request, 'detail.html', context)

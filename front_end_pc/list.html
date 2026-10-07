@@ -261,11 +261,15 @@
     </div>
 
     <div class="breadcrumb">
-        <a :href="cat1.url">[[cat1.name]]</a>
-        <span>></span>
-        <span>[[cat2.name]]</span>
-        <span>></span>
-        <a href="#">[[cat3.name]]</a>
+        <a v-if="cat1.name" :href="cat1.url">[[cat1.name]]</a>
+        <template v-if="cat2.name">
+            <span>&gt;</span>
+            <a :href="cat2.url">[[cat2.name]]</a>
+        </template>
+        <template v-if="cat3.name">
+            <span>&gt;</span>
+            <a :href="cat3.url">[[cat3.name]]</a>
+        </template>
     </div>
 
     <div class="main_wrap clearfix">
@@ -274,7 +278,7 @@
                 <h3>热销排行</h3>
                 <ul>
                     <li v-for="sku in hot_skus">
-                        <a :href="sku.url"><img :src="sku.default_image_url"></a>
+                        <a :href="sku.url"><img :src="sku.default_image_url" :alt="sku.name"></a>
                         <h4><a :href="sku.url">[[sku.name]]</a></h4>
                         <div class="prize">￥[[sku.price]]</div>
                     </li>
@@ -291,7 +295,7 @@
 
             <ul class="goods_type_list clearfix">
                 <li v-for="sku in skus">
-                    <a :href="sku.url"><img :src="sku.default_image_url"></a>
+                    <a :href="sku.url"><img :src="sku.default_image_url" :alt="sku.name"></a>
                     <h4><a :href="sku.url">[[sku.name]]</a></h4>
                     <div class="operate">
                         <span class="prize">￥[[sku.price]]</span>
@@ -322,6 +326,6 @@
     </div>
     </div>
     <script type="text/javascript" src="js/common.js"></script>
-    <script type="text/javascript" src="js/list.js"></script>
+    <script type="text/javascript" src="js/list.js?v=20261006-2"></script>
 </body>
 </html>
